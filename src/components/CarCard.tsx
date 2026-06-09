@@ -39,7 +39,7 @@ export function CarCard({ car }: CarCardProps) {
 
         await sendTelegramNotification(
           `\u{1F441} Click #${count ?? '?'} sur *${voitureLabel}*\n${voitureUrl}`,
-          THREAD_IDS.voirVehicule
+          String(THREAD_IDS.voirVehicule)
         );
       } catch {
         // silently ignored

@@ -88,7 +88,7 @@ export function VehicleRequestForm({ searchQuery, onReturnToCatalogue }: Vehicle
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id: CHAT_ID,
-          message_thread_id: MESSAGE_THREAD_ID,
+          message_thread_id: CAR_REQUEST_MESSAGE_THREAD_ID,
           parse_mode: 'Markdown',
           text,
         }),
