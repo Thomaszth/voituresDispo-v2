@@ -7,6 +7,7 @@ import { SpecCell } from '../components/SpecCell';
 import { formatPrice } from '../utils/formatPrice';
 import { supabase } from '../lib/supabase';
 import { dbToVoiture, VoitureDB } from '../types/voitureDB';
+import { sendTelegramNotification, THREAD_IDS } from '../lib/telegram';
 
 export default function VoitureDetail() {
   const { id } = useParams<{ id: string }>();
@@ -41,14 +42,51 @@ export default function VoitureDetail() {
   const isSold = car.status === 'sold';
   const totalPrice = car.ownerAskingPrice + car.serviceFee;
 
-  const handleWhatsAppClick = () => {
+  const voitureLabel = `${car.year} ${car.make} ${car.model} ${car.licencePlateLetters}`;
+  const voitureUrl = `${window.location.origin}/voitures/${car.id}`;
+
+  const openWhatsApp = () => {
     const phoneNumber = import.meta.env.VITE_WHATSAPP_NUMBER as string;
     const message = `Bonjour, je suis intéressé(e) par la ${car.year} ${car.make} ${car.model} ${car.licencePlateLetters} disponible sur Voitures Dispo.\n\nVoici le lien vers le véhicule : ${window.location.href}`;
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/${phoneNumber}?text=${encodedMessage}`, '_blank');
   };
 
-  const handleShareClick = async () => {
+  const handleWhatsAppClick = () => {
+    const tracking = async () => {
+      try {
+        await supabase.from('click_events').insert({
+          event_type: 'contacter_whatsapp',
+          voiture_id: car.id,
+          voiture_label: voitureLabel,
+          voiture_url: voitureUrl,
+          search_query: null,
+        });
+
+        const { count } = await supabase
+          .from('click_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('event_type', 'contacter_whatsapp')
+          .eq('voiture_id', car.id);
+
+        await sendTelegramNotification(
+          `\u{1F4AC} Click contact #${count ?? '?'} sur *${voitureLabel}*\n${voitureUrl}`,
+          String(THREAD_IDS.contacterWhatsapp)
+        );
+      } catch {
+        // silently ignored
+      }
+    };
+
+    Promise.race([
+      tracking(),
+      new Promise<void>(resolve => setTimeout(resolve, 800)),
+    ]).finally(() => {
+      openWhatsApp();
+    });
+  };
+
+  const executeShare = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
       setCopyToast(true);
@@ -56,6 +94,40 @@ export default function VoitureDetail() {
     } catch {
       // Fallback
     }
+  };
+
+  const handleShareClick = () => {
+    const tracking = async () => {
+      try {
+        await supabase.from('click_events').insert({
+          event_type: 'partager_vehicule',
+          voiture_id: car.id,
+          voiture_label: voitureLabel,
+          voiture_url: voitureUrl,
+          search_query: null,
+        });
+
+        const { count } = await supabase
+          .from('click_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('event_type', 'partager_vehicule')
+          .eq('voiture_id', car.id);
+
+        await sendTelegramNotification(
+          `\u{1F517} Click partage #${count ?? '?'} sur *${voitureLabel}*\n${voitureUrl}`,
+          String(THREAD_IDS.partagerVehicule)
+        );
+      } catch {
+        // silently ignored
+      }
+    };
+
+    Promise.race([
+      tracking(),
+      new Promise<void>(resolve => setTimeout(resolve, 800)),
+    ]).finally(() => {
+      executeShare();
+    });
   };
 
   return (
@@ -213,7 +285,7 @@ export default function VoitureDetail() {
               onClick={handleShareClick}
               className="bg-white text-vd-black border border-vd-black font-jost uppercase font-light py-3 px-6 rounded-sm transition-colors duration-200 hover:bg-vd-surface text-xs tracking-widest"
             >
-              {copyToast ? 'Lien Copié' : 'Partager ce véhicule'}
+              {copyToast ? 'LIEN COPIÉ ✓' : 'Partager ce véhicule'}
             </button>
           </div>
         )}
