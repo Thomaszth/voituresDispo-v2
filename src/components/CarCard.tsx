@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Voiture } from '../types/voiture';
 import { formatPrice } from '../utils/formatPrice';
+import { supabase } from '../lib/supabase';
+import { sendTelegramNotification, THREAD_IDS } from '../lib/telegram';
 
 interface CarCardProps {
   car: Voiture;
@@ -12,10 +14,48 @@ export function CarCard({ car }: CarCardProps) {
   const totalPrice = car.ownerAskingPrice + car.serviceFee;
   const [imgError, setImgError] = useState(false);
   const hasImage = car.images[0] && !imgError;
+  const navigate = useNavigate();
+
+  const voitureLabel = `${car.year} ${car.make} ${car.model} ${car.licencePlateLetters}`;
+  const voitureUrl = `${window.location.origin}/voitures/${car.id}`;
+
+  const handleCtaClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const tracking = async () => {
+      try {
+        await supabase.from('click_events').insert({
+          event_type: 'voir_vehicule',
+          voiture_id: car.id,
+          voiture_label: voitureLabel,
+          voiture_url: voitureUrl,
+          search_query: null,
+        });
+
+        const { count } = await supabase
+          .from('click_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('event_type', 'voir_vehicule')
+          .eq('voiture_id', car.id);
+
+        await sendTelegramNotification(
+          `\u{1F441} Click #${count ?? '?'} sur *${voitureLabel}*\n${voitureUrl}`,
+          THREAD_IDS.voirVehicule
+        );
+      } catch {
+        // silently ignored
+      }
+    };
+
+    Promise.race([
+      tracking(),
+      new Promise<void>(resolve => setTimeout(resolve, 800)),
+    ]).finally(() => {
+      navigate(`/voitures/${car.id}`);
+    });
+  };
 
   return (
-    <Link
-      to={`/voitures/${car.id}`}
+    <div
       className="group flex flex-col bg-white border border-vd-border rounded-sm overflow-hidden transition-shadow duration-300 hover:shadow-subtle-md cursor-pointer"
     >
       <div
@@ -64,11 +104,15 @@ export function CarCard({ car }: CarCardProps) {
         </p>
       </div>
 
-      <div className="border-t border-vd-border px-5 py-4 transition-all duration-200 group-hover:translate-x-1">
+      <button
+        type="button"
+        onClick={handleCtaClick}
+        className="border-t border-vd-border px-5 py-4 transition-all duration-200 group-hover:translate-x-1 text-left w-full"
+      >
         <p className="font-jost uppercase font-light text-vd-text text-cta tracking-widest">
           {isSold ? 'VOIR LE VÉHICULE (VENDU) →' : 'VOIR LE VÉHICULE →'}
         </p>
-      </div>
-    </Link>
+      </button>
+    </div>
   );
 }
