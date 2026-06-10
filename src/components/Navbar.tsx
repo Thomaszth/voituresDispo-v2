@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { sendTelegramNotification, THREAD_IDS } from '../lib/telegram';
 
 interface NavbarProps {
   searchValue: string;
@@ -25,6 +27,44 @@ export default function Navbar({ searchValue, onSearchChange, onSearchSubmit }: 
       mobileInputRef.current.focus();
     }
   }, [mobileSearchOpen]);
+
+  const lastTrackedQuery = useRef<string | null>(null);
+
+  useEffect(() => {
+    const trimmed = searchValue.trim();
+    if (trimmed.length < 3) return;
+
+    const timer = setTimeout(async () => {
+      const current = searchValue.trim();
+      if (current.length < 3) return;
+      if (current === lastTrackedQuery.current) return;
+
+      lastTrackedQuery.current = current;
+
+      try {
+        await supabase.from('click_events').insert({
+          event_type: 'search_query',
+          search_query: current,
+          voiture_id: null,
+          voiture_label: null,
+          voiture_url: null,
+        });
+
+        await sendTelegramNotification(
+          `\u{1F50D} Nouvelle recherche : *${current}*`,
+          String(THREAD_IDS.searchQueries)
+        );
+      } catch {
+        // silently ignored
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [searchValue]);
+
+  useEffect(() => {
+    lastTrackedQuery.current = null;
+  }, [location.pathname]);
 
   const handleClear = () => {
     onSearchChange('');
