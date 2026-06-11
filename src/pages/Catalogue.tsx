@@ -68,15 +68,13 @@ export default function Catalogue({ searchValue, onClearSearch }: CatalogueProps
     <main className="min-h-screen bg-white">
       <section className="w-full bg-vd-black py-20 md:py-32 lg:py-40 relative">
         <div className="px-5 md:px-8 lg:px-12 flex flex-col items-center text-center">
-          <p className="font-jost font-light text-vd-caption uppercase text-label tracking-widest anim-init animate-fade-up">
-            Collection
-          </p>
           <h1 className="font-cormorant font-light text-white mt-6 text-[clamp(48px,10vw,80px)] tracking-wide anim-init animate-fade-up">
-            Notre Collection
+              Notre Collection
+
           </h1>
           <div className="h-px bg-gray-600 mt-8 w-15 anim-init animate-fade-up" />
           <p className="font-jost font-light text-vd-caption mt-8 max-w-lg text-sm tracking-wide anim-init animate-fade-up">
-            Garantie: un seul intermédiaire, nous.
+             Garantie: un seul intermédiaire, nous. 
           </p>
         </div>
         {!showScrollHint && (

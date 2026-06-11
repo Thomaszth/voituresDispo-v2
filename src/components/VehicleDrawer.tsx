@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { X, GripVertical } from 'lucide-react';
 import { VoitureDB } from '../types/voitureDB';
 import { formatPrice } from '../utils/formatPrice';
 import { supabase } from '../lib/supabase';
@@ -145,6 +145,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export function VehicleDrawer({ open, onClose, editing }: VehicleDrawerProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
   const widgetRef = useRef<ReturnType<typeof window.cloudinary.createUploadWidget> | null>(null);
 
   useEffect(() => {
@@ -205,6 +207,41 @@ export function VehicleDrawer({ open, onClose, editing }: VehicleDrawerProps) {
 
   const removeImage = (idx: number) =>
     setForm(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
+
+  const handleDragStart = useCallback((idx: number) => {
+    setDragIdx(idx);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    setOverIdx(idx);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setOverIdx(null);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent, targetIdx: number) => {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === targetIdx) {
+      setDragIdx(null);
+      setOverIdx(null);
+      return;
+    }
+    setForm(prev => {
+      const updated = [...prev.images];
+      const [moved] = updated.splice(dragIdx, 1);
+      updated.splice(targetIdx, 0, moved);
+      return { ...prev, images: updated };
+    });
+    setDragIdx(null);
+    setOverIdx(null);
+  }, [dragIdx]);
+
+  const handleDragEnd = useCallback(() => {
+    setDragIdx(null);
+    setOverIdx(null);
+  }, []);
 
   const handleSave = async () => {
     console.log('ENREGISTRER cliqué');
@@ -467,11 +504,28 @@ export function VehicleDrawer({ open, onClose, editing }: VehicleDrawerProps) {
             {form.images.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {form.images.map((url, idx) => (
-                  <div key={idx} className="relative w-20 h-20 flex-shrink-0">
+                  <div
+                    key={`${idx}-${url}`}
+                    draggable
+                    onDragStart={() => handleDragStart(idx)}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, idx)}
+                    onDragEnd={handleDragEnd}
+                    className={`relative w-20 h-20 flex-shrink-0 rounded-sm ${
+                      dragIdx === idx ? 'opacity-40' : ''
+                    } ${dragIdx !== null && dragIdx !== idx ? 'cursor-grabbing' : 'cursor-grab'}`}
+                    style={overIdx === idx && dragIdx !== null ? { border: '2px solid #0A0A0A' } : undefined}
+                  >
                     <img
                       src={url}
                       alt={`Photo ${idx + 1}`}
                       className="w-full h-full object-cover rounded-sm"
+                    />
+                    <GripVertical
+                      size={14}
+                      style={{ color: '#FFFFFF' }}
+                      className="absolute top-0.5 left-0.5 drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]"
                     />
                     <button
                       type="button"

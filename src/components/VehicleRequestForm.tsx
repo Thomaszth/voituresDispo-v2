@@ -8,7 +8,6 @@ interface FormFields {
   telephone: string;
   countryCode: string;
   vehicule: string;
-  budget: string;
 }
 
 interface FormErrors {
@@ -28,7 +27,6 @@ export function VehicleRequestForm({ searchQuery, onReturnToCatalogue }: Vehicle
     telephone: '',
     countryCode: 'BJ',
     vehicule: searchQuery,
-    budget: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
@@ -71,14 +69,12 @@ export function VehicleRequestForm({ searchQuery, onReturnToCatalogue }: Vehicle
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
     const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} à ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-    const budget = fields.budget.trim() || 'Non renseigné';
 
     const text =
       `*Nouvelle demande de véhicule*\n\n` +
       `*Nom :* ${fields.nom}\n` +
       `*Téléphone :* ${findCountryByCode(fields.countryCode)?.callingCode}${fields.telephone}\n` +
-      `*Véhicule recherché :* ${fields.vehicule}\n` +
-      `*Budget :* ${budget}\n\n` +
+      `*Véhicule recherché :* ${fields.vehicule}\n\n` +
       `*Statut :* En attente\n` +
       `*Reçue le :* ${dateStr}`;
 
@@ -193,18 +189,6 @@ export function VehicleRequestForm({ searchQuery, onReturnToCatalogue }: Vehicle
               {errors.vehicule}
             </p>
           )}
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-jost font-light text-vd-meta uppercase text-label tracking-widest">
-            Votre budget approximatif
-          </label>
-          <input
-            type="text"
-            value={fields.budget}
-            onChange={e => handleChange('budget', e.target.value)}
-            className="w-full border-b border-vd-border bg-transparent font-jost font-light text-vd-text py-2 text-sm focus:outline-none focus:border-vd-text transition-colors duration-200"
-          />
         </div>
 
         <button
