@@ -1,16 +1,32 @@
+import { useState } from 'react';
 import { usePalmares } from '../../hooks/usePalmares';
 import { dbToPalmares, Palmares } from '../../types/palmares';
 import { formatPrice } from '../../utils/formatPrice';
 
 function SaleCard({ entry }: { entry: Palmares }) {
+  const [imgError, setImgError] = useState(false);
+
   return (
     <div className="group bg-white border border-vd-border rounded-sm overflow-hidden transition-shadow duration-300 hover:shadow-subtle-md">
-      <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4/3' }}>
-        <img
-          src={entry.photo}
-          alt={entry.carName}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-        />
+      <div
+        className="relative w-full overflow-hidden flex items-center justify-center h-[180px] md:h-[200px] lg:h-[220px]"
+        style={{ backgroundColor: '#0A0A0A' }}
+      >
+        {!imgError ? (
+          <img
+            src={entry.photo}
+            alt={entry.carName}
+            onError={() => setImgError(true)}
+            className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <span
+            className="font-jost uppercase text-center"
+            style={{ fontSize: '11px', letterSpacing: '0.15em', color: '#444' }}
+          >
+            AUCUNE PHOTO
+          </span>
+        )}
         <div className="absolute bottom-0 left-0 right-0" style={{ background: 'rgba(0,0,0,0.72)' }}>
           <p className="font-jost uppercase text-white text-center" style={{ fontSize: '9px', letterSpacing: '0.18em', padding: '6px 12px' }}>
             VENDU EN {entry.daysToSell} JOUR(S)
