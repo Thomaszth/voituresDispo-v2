@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Catalogue from './pages/Catalogue';
 import VoitureDetail from './pages/VoitureDetail';
 import Admin from './pages/Admin';
+import Palmares from './pages/Palmares';
 import './App.css';
 
 function AppShell() {
@@ -32,6 +33,7 @@ function AppShell() {
         <Route path="/catalogue" element={<Catalogue searchValue={isCatalogue ? searchValue : ''} onClearSearch={() => setSearchValue('')} />} />
         <Route path="/voitures/:id" element={<VoitureDetail />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/palmares" element={<Palmares />} />
       </Routes>
     </div>
   );

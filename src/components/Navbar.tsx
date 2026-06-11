@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { sendTelegramNotification, THREAD_IDS } from '../lib/telegram';
@@ -142,7 +142,18 @@ export default function Navbar({ searchValue, onSearchChange, onSearchSubmit }: 
             </div>
           </div>
 
-          <div className="flex-shrink-0 ml-auto md:ml-0">
+          <div className="flex-shrink-0 ml-auto flex items-center gap-4">
+            <NavLink
+              to="/palmares"
+              className={({ isActive }) =>
+                `font-jost uppercase font-light no-underline transition-all duration-200 ${
+                  isActive ? 'opacity-100 underline' : 'opacity-70 hover:opacity-100 hover:underline'
+                }`
+              }
+              style={{ fontSize: '11px', letterSpacing: '0.18em', color: '#FFFFFF', textDecorationColor: 'currentColor' }}
+            >
+              NOS VENTES
+            </NavLink>
             <button
               className="md:hidden flex items-center justify-center text-white transition-opacity duration-200 hover:opacity-70"
               onClick={() => setMobileSearchOpen(prev => !prev)}
