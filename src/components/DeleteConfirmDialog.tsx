@@ -2,9 +2,10 @@ interface DeleteConfirmProps {
   open: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  message?: string;
 }
 
-export function DeleteConfirmDialog({ open, onConfirm, onCancel }: DeleteConfirmProps) {
+export function DeleteConfirmDialog({ open, onConfirm, onCancel, message }: DeleteConfirmProps) {
   if (!open) return null;
 
   return (
@@ -12,7 +13,7 @@ export function DeleteConfirmDialog({ open, onConfirm, onCancel }: DeleteConfirm
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
       <div className="relative bg-white border border-vd-border p-6 w-full max-w-sm">
         <p className="font-cormorant font-light text-vd-text text-xl leading-snug mb-6">
-          Êtes-vous sûr(e) de vouloir supprimer ce véhicule ?
+          {message ?? 'Êtes-vous sûr(e) de vouloir supprimer ce véhicule ?'}
         </p>
         <div className="flex flex-col gap-3">
           <button
