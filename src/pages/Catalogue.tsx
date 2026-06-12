@@ -5,6 +5,9 @@ import { matchesCar } from '../utils/matchesCar';
 import { useVoitures } from '../hooks/useVoitures';
 import { dbToVoiture } from '../types/voitureDB';
 import { ChevronDown } from 'lucide-react';
+import { trackSession } from '../lib/session';
+import { supabase } from '../lib/supabase';
+import { sendTelegramNotification, THREAD_IDS } from '../lib/telegram';
 
 const CARS_PER_PAGE = 8;
 
@@ -19,6 +22,35 @@ export default function Catalogue({ searchValue, onClearSearch }: CatalogueProps
   const [hintVisible, setHintVisible] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const gridRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    // Page visit tracking — fire-and-forget
+    (async () => {
+      try {
+        await trackSession();
+        const label = 'catalogue';
+        await supabase.from('click_events').insert({
+          event_type: 'page_visit',
+          voiture_id: null,
+          voiture_label: label,
+          voiture_url: window.location.href,
+          search_query: null,
+        });
+        const { count } = await supabase
+          .from('click_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('event_type', 'page_visit')
+          .eq('voiture_label', label);
+        // Dedicated thread ID for page visits can be added to THREAD_IDS later if the owner wants
+        await sendTelegramNotification(
+          `\u{1F4C4} Visite catalogue #${count ?? '?'}\n${window.location.href}`,
+          String(THREAD_IDS.voirVehicule)
+        );
+      } catch {
+        // silently ignored
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     const fadeTimeout = setTimeout(() => {

@@ -8,12 +8,41 @@ import { formatPrice } from '../utils/formatPrice';
 import { supabase } from '../lib/supabase';
 import { dbToVoiture, VoitureDB } from '../types/voitureDB';
 import { sendTelegramNotification, THREAD_IDS } from '../lib/telegram';
+import { trackSession } from '../lib/session';
 
 export default function VoitureDetail() {
   const { id } = useParams<{ id: string }>();
   const [car, setCar] = useState<Voiture | null>(null);
   const [mainImage, setMainImage] = useState<string>('');
   const [copyToast, setCopyToast] = useState(false);
+
+  useEffect(() => {
+    // Page visit tracking — fire-and-forget
+    (async () => {
+      try {
+        await trackSession();
+        const label = '/voitures/' + id;
+        await supabase.from('click_events').insert({
+          event_type: 'page_visit',
+          voiture_id: id ?? null,
+          voiture_label: label,
+          voiture_url: window.location.href,
+          search_query: null,
+        });
+        const { count } = await supabase
+          .from('click_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('event_type', 'page_visit')
+          .eq('voiture_label', label);
+        await sendTelegramNotification(
+          `\u{1F4C4} Visite fiche #${count ?? '?'} — *${label}*\n${window.location.href}`,
+          String(THREAD_IDS.voirVehicule)
+        );
+      } catch {
+        // silently ignored
+      }
+    })();
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
