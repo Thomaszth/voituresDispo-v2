@@ -1,11 +1,11 @@
 import { useParams, Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Voiture } from '../types/voiture';
 import Toast from '../components/Toast';
 import { PriceRow } from '../components/PriceRow';
 import { SpecCell } from '../components/SpecCell';
 import { formatPrice } from '../utils/formatPrice';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseUrl, supabaseAnonKey } from '../lib/supabase';
 import { dbToVoiture, VoitureDB } from '../types/voitureDB';
 import { sendTelegramNotification, THREAD_IDS } from '../lib/telegram';
 import { trackSession } from '../lib/session';
@@ -15,6 +15,54 @@ export default function VoitureDetail() {
   const [car, setCar] = useState<Voiture | null>(null);
   const [mainImage, setMainImage] = useState<string>('');
   const [copyToast, setCopyToast] = useState(false);
+  const carRef = useRef<Voiture | null>(null);
+
+  // Keep carRef in sync so the unmount cleanup can read it
+  useEffect(() => {
+    carRef.current = car;
+  }, [car]);
+
+  // Time-on-page tracking — fires on unmount via sendBeacon
+  useEffect(() => {
+    const startTime = Date.now();
+    return () => {
+      try {
+        const carData = carRef.current;
+        if (!carData) return;
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        const bucket = elapsed < 10 ? 'rebond' : elapsed < 60 ? 'lu_rapidement' : 'lu_en_detail';
+        const voitureLabel = `${carData.year} ${carData.make} ${carData.model} ${carData.licencePlateLetters}`;
+        const voitureUrl = `${window.location.origin}/voitures/${carData.id}`;
+        const payload = JSON.stringify({
+          event_type: 'time_on_page',
+          voiture_id: carData.id,
+          voiture_label: voitureLabel,
+          voiture_url: voitureUrl,
+          search_query: bucket,
+        });
+        const endpoint = `${supabaseUrl}/rest/v1/click_events`;
+        const headers: Record<string, string> = {
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        };
+        if (navigator.sendBeacon) {
+          const blob = new Blob([payload], { type: 'application/json' });
+          navigator.sendBeacon(endpoint, blob);
+        }
+        fetch(endpoint, { method: 'POST', headers, body: payload, keepalive: true }).catch(() => {});
+        if (bucket !== 'rebond') {
+          sendTelegramNotification(
+            `\u23F1 *${voitureLabel}* — ${bucket} (${elapsed} secondes)\n${voitureUrl}`,
+            String(THREAD_IDS.timeSpentOnCarOfCarPage)
+          ).catch(() => {});
+        }
+      } catch {
+        // silently ignored
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // Page visit tracking — fire-and-forget
@@ -36,7 +84,7 @@ export default function VoitureDetail() {
           .eq('voiture_label', label);
         await sendTelegramNotification(
           `\u{1F4C4} Visite fiche #${count ?? '?'} — *${label}*\n${window.location.href}`,
-          String(THREAD_IDS.voirVehicule)
+          String(THREAD_IDS.carPageVisit)
         );
       } catch {
         // silently ignored
@@ -191,7 +239,31 @@ export default function VoitureDetail() {
           {car.images.map((image, idx) => (
             <button
               key={idx}
-              onClick={() => setMainImage(image)}
+              onClick={() => {
+                setMainImage(image);
+                (async () => {
+                  try {
+                    await supabase.from('click_events').insert({
+                      event_type: 'gallery_click',
+                      voiture_id: car.id,
+                      voiture_label: voitureLabel,
+                      voiture_url: voitureUrl,
+                      search_query: null,
+                    });
+                    const { count } = await supabase
+                      .from('click_events')
+                      .select('*', { count: 'exact', head: true })
+                      .eq('event_type', 'gallery_click')
+                      .eq('voiture_id', car.id);
+                    await sendTelegramNotification(
+                      `\u{1F5BC} Photo #${idx + 1} sur *${voitureLabel}* (galerie vue ${count ?? '?'} fois)\n${voitureUrl}`,
+                      String(THREAD_IDS.clicksThroughCarThumbnailsOfCarPage)
+                    );
+                  } catch {
+                    // silently ignored
+                  }
+                })();
+              }}
               className="flex-shrink-0 transition-opacity duration-150 rounded-sm w-15 h-15 md:w-20 md:h-20 border-vd-border p-0.5"
             >
               <img

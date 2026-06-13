@@ -30,7 +30,7 @@ export default function Palmares() {
           .eq('voiture_label', label);
         await sendTelegramNotification(
           `\u{1F4C4} Visite palmarès #${count ?? '?'}\n${window.location.href}`,
-          String(THREAD_IDS.carSellerLeads)
+          String(THREAD_IDS.palmaresPageVisit)
         );
       } catch {
         // silently ignored
