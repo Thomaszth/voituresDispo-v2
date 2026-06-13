@@ -1,5 +1,30 @@
+import { sendTelegramNotification, THREAD_IDS } from '../../lib/telegram';
+import { supabase } from '../../lib/supabase';
+
 export function PalmaresCta() {
   const scrollToForm = () => {
+    (async () => {
+      try {
+        await supabase.from('click_events').insert({
+          event_type: 'cta_palmares',
+          voiture_id: null,
+          voiture_label: 'cta_confier_vehicule',
+          voiture_url: window.location.href,
+          search_query: null,
+        });
+        const { count } = await supabase
+          .from('click_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('event_type', 'cta_palmares');
+        await sendTelegramNotification(
+          `\u{1F3AF} CTA palmarès cliqué #${count ?? '?'} fois\nUn visiteur veut confier son véhicule.`,
+          String(THREAD_IDS.carSellerLeads)
+        );
+      } catch {
+        // silently ignored
+      }
+    })();
+
     const el = document.getElementById('confier-form');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
