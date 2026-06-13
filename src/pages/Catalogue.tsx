@@ -44,7 +44,7 @@ export default function Catalogue({ searchValue, onClearSearch }: CatalogueProps
         // Dedicated thread ID for page visits can be added to THREAD_IDS later if the owner wants
         await sendTelegramNotification(
           `\u{1F4C4} Visite catalogue #${count ?? '?'}\n${window.location.href}`,
-          String(THREAD_IDS.voirVehicule)
+          String(THREAD_IDS.catalogPageVisit)
         );
       } catch {
         // silently ignored
@@ -90,6 +90,32 @@ export default function Catalogue({ searchValue, onClearSearch }: CatalogueProps
     setCurrentPage(page);
     if (gridRef.current) {
       gridRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+    if (page > 1) {
+      (async () => {
+        try {
+          const voitureLabel = 'page_' + page;
+          const searchQuery = searchValue.trim() || null;
+          await supabase.from('click_events').insert({
+            event_type: 'pagination_depth',
+            voiture_id: null,
+            voiture_label: voitureLabel,
+            voiture_url: window.location.href,
+            search_query: searchQuery,
+          });
+          const { count } = await supabase
+            .from('click_events')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_type', 'pagination_depth')
+            .eq('voiture_label', voitureLabel);
+          await sendTelegramNotification(
+            `\u{1F4CB} Page ${page} du catalogue visitée #${count ?? '?'} fois\nRecherche active : ${searchQuery ?? 'aucune'}`,
+            String(THREAD_IDS.paginationDepthTracking)
+          );
+        } catch {
+          // silently ignored
+        }
+      })();
     }
   };
 

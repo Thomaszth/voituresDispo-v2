@@ -8,6 +8,12 @@ export const THREAD_IDS = {
   searchQueries: Number(import.meta.env.VITE_TELEGRAM_SEARCH_QUERIES_MESSAGE_THREAD_ID),
   dailyReport: Number(import.meta.env.VITE_TELEGRAM_DAILY_REPORT_MESSAGE_THREAD_ID),
   carSellerLeads: Number(import.meta.env.VITE_TELEGRAM_CAR_SELLER_LEADS_MESSAGE_THREAD_ID),
+  catalogPageVisit: Number(import.meta.env.VITE_TELEGRAM_CATALOG_PAGE_VISIT_MESSAGE_THREAD_ID),
+  carPageVisit: Number(import.meta.env.VITE_TELEGRAM_CAR_PAGE_VISIT_MESSAGE_THREAD_ID),
+  palmaresPageVisit: Number(import.meta.env.VITE_TELEGRAM_PALMARES_PAGE_VISIT_MESSAGE_THREAD_ID),
+  clicksThroughCarThumbnailsOfCarPage: Number(import.meta.env.VITE_TELEGRAM_CLICKS_THROUGH_CAR_THUMBNAILS_OF_CAR_PAGE_MESSAGE_THREAD_ID),
+  timeSpentOnCarOfCarPage: Number(import.meta.env.VITE_TELEGRAM_TIME_SPENT_ON_CAR_OF_CAR_PAGE_MESSAGE_THREAD_ID),
+  paginationDepthTracking: Number(import.meta.env.VITE_TELEGRAM_PAGINATION_DEPTH_TRACKING_MESSAGE_THREAD_ID),
 };
 
 export async function sendTelegramNotification(message: string, threadId: string) {
