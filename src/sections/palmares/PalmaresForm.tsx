@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
+import { sendTelegramNotification, THREAD_IDS } from '../../lib/telegram';
 
 const BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN as string;
 const CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID as string;
@@ -49,6 +50,33 @@ export function PalmaresForm({ onStepChange }: PalmaresFormProps) {
   const [askingPrice, setAskingPrice] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [fadeIn, setFadeIn] = useState(false);
+  const hasTrackedFormStart = useRef(false);
+
+  const trackFormStart = () => {
+    if (hasTrackedFormStart.current) return;
+    hasTrackedFormStart.current = true;
+    (async () => {
+      try {
+        await supabase.from('click_events').insert({
+          event_type: 'form_started',
+          voiture_id: null,
+          voiture_label: 'palmares_form',
+          voiture_url: window.location.href,
+          search_query: null,
+        });
+        const { count } = await supabase
+          .from('click_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('event_type', 'form_started');
+        await sendTelegramNotification(
+          `\u270D\uFE0F Formulaire palmarès commencé #${count ?? '?'} fois\nUn visiteur a commencé à remplir le formulaire.`,
+          String(THREAD_IDS.carSellerLeads)
+        );
+      } catch {
+        // silently ignored
+      }
+    })();
+  };
 
   useEffect(() => {
     onStepChange(currentStep);
@@ -149,6 +177,7 @@ export function PalmaresForm({ onStepChange }: PalmaresFormProps) {
               <input
                 type="text"
                 value={fullName}
+                onFocus={trackFormStart}
                 onChange={e => { setFullName(e.target.value); if (errors.fullName) setErrors(prev => { const n = { ...prev }; delete n.fullName; return n; }); }}
                 placeholder="Votre nom complet"
                 className={inputStyle}
