@@ -2,12 +2,12 @@ import { useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { Voiture } from '../types/voiture';
 import Toast from '../components/Toast';
-import { ActionButton } from '../components/ActionButton';
 import { BackToCatalogueLink } from '../components/BackToCatalogueLink';
 import { VoitureDetailGallery } from '../sections/voitureDetail/VoitureDetailGallery';
 import { VoitureDetailInfo } from '../sections/voitureDetail/VoitureDetailInfo';
 import { VoitureDetailSpecs } from '../sections/voitureDetail/VoitureDetailSpecs';
 import { VoitureDetailDescription } from '../sections/voitureDetail/VoitureDetailDescription';
+import { VoitureDetailActions } from '../sections/voitureDetail/VoitureDetailActions';
 import { supabase } from '../lib/supabase';
 import { dbToVoiture, VoitureDB } from '../types/voitureDB';
 import { THREAD_IDS } from '../lib/telegram';
@@ -16,10 +16,6 @@ import { useCarPageTracking } from '../hooks/useCarPageTracking';
 import { useTimeOnPageTracking } from '../hooks/useTimeOnPageTracking';
 import { trackViewContent, trackContact } from '../lib/pixel';
 import {
-  LABEL_SOLD_MESSAGE,
-  LABEL_BTN_WHATSAPP,
-  LABEL_BTN_SHARE,
-  LABEL_BTN_LINK_COPIED,
   LABEL_LOADING,
   LABEL_TOAST_LINK_COPIED,
   WHATSAPP_MESSAGE_TEMPLATE,
@@ -218,28 +214,12 @@ export default function VoitureDetail() {
 
         <VoitureDetailDescription car={car} />
 
-        {isSold ? (
-          <div className="flex flex-col items-center text-center py-12 gap-4">
-            <div className="w-12 border-t border-vd-border" />
-            <p className="font-cormorant font-light italic text-vd-caption text-xl">
-              {LABEL_SOLD_MESSAGE}
-            </p>
-            <div className="w-12 border-t border-vd-border" />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ActionButton
-              text={LABEL_BTN_WHATSAPP}
-              onClick={handleWhatsAppClick}
-              variant="primary"
-            />
-            <ActionButton
-              text={copyToast ? LABEL_BTN_LINK_COPIED : LABEL_BTN_SHARE}
-              onClick={handleShareClick}
-              variant="secondary"
-            />
-          </div>
-        )}
+        <VoitureDetailActions
+          isSold={isSold}
+          copyToast={copyToast}
+          onWhatsAppClick={handleWhatsAppClick}
+          onShareClick={handleShareClick}
+        />
       </section>
 
       {copyToast && <Toast message={LABEL_TOAST_LINK_COPIED} />}
