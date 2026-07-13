@@ -6,6 +6,7 @@ import Catalogue from './pages/Catalogue';
 import VoitureDetail from './pages/VoitureDetail';
 import Admin from './pages/Admin';
 import Palmares from './pages/Palmares';
+import Recherches from './pages/Recherches';
 import './App.css';
 
 function AppShell() {
@@ -34,6 +35,7 @@ function AppShell() {
         <Route path="/voitures/:id" element={<VoitureDetail />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/palmares" element={<Palmares />} />
+        <Route path="/recherches" element={<Recherches />} />
       </Routes>
     </div>
   );

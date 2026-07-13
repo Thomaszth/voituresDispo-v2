@@ -192,6 +192,272 @@ async function getSearchQueriesCount(
   return data?.length || 0;
 }
 
+// PHASE 3 REPORTS — added after initial deployment
+// New secret required: THREAD_ID_SELLER_LEADS
+// Add it in Supabase dashboard → Edge Functions → daily-digest → Secrets
+
+interface LabelStats {
+  label: string;
+  count: number;
+}
+
+interface PageVisitsStats {
+  total: number;
+  catalogue: number;
+  palmares: number;
+  vehicleTotal: number;
+  topVehicles: LabelStats[];
+}
+
+async function getPageVisitsStats(
+  supabase: ReturnType<typeof createClient>,
+  startUTC: Date,
+  endUTC: Date
+): Promise<PageVisitsStats> {
+  const { data, error } = await supabase
+    .from("click_events")
+    .select("*")
+    .eq("event_type", "page_visit")
+    .gte("created_at", startUTC.toISOString())
+    .lte("created_at", endUTC.toISOString());
+
+  if (error) {
+    console.error("Error fetching page visits:", error);
+    return { total: 0, catalogue: 0, palmares: 0, vehicleTotal: 0, topVehicles: [] };
+  }
+
+  const events = data as ClickEvent[];
+  let catalogue = 0;
+  let palmares = 0;
+  const vehicleMap = new Map<string, number>();
+
+  for (const event of events) {
+    const label = event.voiture_label || "";
+    if (label === "catalogue") {
+      catalogue++;
+    } else if (label === "palmares") {
+      palmares++;
+    } else if (label.startsWith("/voitures/")) {
+      vehicleMap.set(label, (vehicleMap.get(label) || 0) + 1);
+    }
+  }
+
+  const vehicleTotal = Array.from(vehicleMap.values()).reduce((sum, c) => sum + c, 0);
+  const topVehicles = Array.from(vehicleMap.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3);
+
+  return { total: events.length, catalogue, palmares, vehicleTotal, topVehicles };
+}
+
+interface GalleryClicksStats {
+  total: number;
+  top: LabelStats[];
+}
+
+async function getGalleryClicksStats(
+  supabase: ReturnType<typeof createClient>,
+  startUTC: Date,
+  endUTC: Date
+): Promise<GalleryClicksStats> {
+  const { data, error } = await supabase
+    .from("click_events")
+    .select("*")
+    .eq("event_type", "gallery_click")
+    .gte("created_at", startUTC.toISOString())
+    .lte("created_at", endUTC.toISOString());
+
+  if (error) {
+    console.error("Error fetching gallery clicks:", error);
+    return { total: 0, top: [] };
+  }
+
+  const events = data as ClickEvent[];
+  const labelMap = new Map<string, number>();
+
+  for (const event of events) {
+    const label = event.voiture_label || "Véhicule inconnu";
+    labelMap.set(label, (labelMap.get(label) || 0) + 1);
+  }
+
+  const top = Array.from(labelMap.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3);
+
+  return { total: events.length, top };
+}
+
+interface TimeOnPageStats {
+  total: number;
+  rebond: number;
+  lu_rapidement: number;
+  lu_en_detail: number;
+}
+
+async function getTimeOnPageStats(
+  supabase: ReturnType<typeof createClient>,
+  startUTC: Date,
+  endUTC: Date
+): Promise<TimeOnPageStats> {
+  const { data, error } = await supabase
+    .from("click_events")
+    .select("*")
+    .eq("event_type", "time_on_page")
+    .gte("created_at", startUTC.toISOString())
+    .lte("created_at", endUTC.toISOString());
+
+  if (error) {
+    console.error("Error fetching time on page:", error);
+    return { total: 0, rebond: 0, lu_rapidement: 0, lu_en_detail: 0 };
+  }
+
+  const events = data as ClickEvent[];
+  let rebond = 0;
+  let lu_rapidement = 0;
+  let lu_en_detail = 0;
+
+  for (const event of events) {
+    const bucket = event.search_query;
+    if (bucket === "rebond") rebond++;
+    else if (bucket === "lu_rapidement") lu_rapidement++;
+    else if (bucket === "lu_en_detail") lu_en_detail++;
+  }
+
+  return { total: events.length, rebond, lu_rapidement, lu_en_detail };
+}
+
+interface SellerFunnelStats {
+  palmaresVisits: number;
+  ctaClicks: number;
+  formStarts: number;
+  completedLeads: number;
+}
+
+async function getSellerFunnelStats(
+  supabase: ReturnType<typeof createClient>,
+  startUTC: Date,
+  endUTC: Date
+): Promise<SellerFunnelStats> {
+  const [visitsRes, ctaRes, formRes, leadsRes] = await Promise.all([
+    supabase
+      .from("click_events")
+      .select("*")
+      .eq("event_type", "page_visit")
+      .eq("voiture_label", "palmares")
+      .gte("created_at", startUTC.toISOString())
+      .lte("created_at", endUTC.toISOString()),
+    supabase
+      .from("click_events")
+      .select("*")
+      .eq("event_type", "cta_palmares")
+      .gte("created_at", startUTC.toISOString())
+      .lte("created_at", endUTC.toISOString()),
+    supabase
+      .from("click_events")
+      .select("*")
+      .eq("event_type", "form_started")
+      .eq("voiture_label", "palmares_form")
+      .gte("created_at", startUTC.toISOString())
+      .lte("created_at", endUTC.toISOString()),
+    supabase
+      .from("palmares_leads")
+      .select("*")
+      .gte("submitted_at", startUTC.toISOString())
+      .lte("submitted_at", endUTC.toISOString()),
+  ]);
+
+  return {
+    palmaresVisits: visitsRes.data?.length || 0,
+    ctaClicks: ctaRes.data?.length || 0,
+    formStarts: formRes.data?.length || 0,
+    completedLeads: leadsRes.data?.length || 0,
+  };
+}
+
+interface RecherchesSourcingStats {
+  pageVisits: number;
+  whatsappClicks: number;
+  topLabels: LabelStats[];
+}
+
+async function getRecherchesSourcingStats(
+  supabase: ReturnType<typeof createClient>,
+  startUTC: Date,
+  endUTC: Date
+): Promise<RecherchesSourcingStats> {
+  const [visitsRes, clicksRes] = await Promise.all([
+    supabase
+      .from("click_events")
+      .select("*")
+      .eq("event_type", "page_visit")
+      .eq("voiture_label", "recherches")
+      .gte("created_at", startUTC.toISOString())
+      .lte("created_at", endUTC.toISOString()),
+    supabase
+      .from("click_events")
+      .select("*")
+      .eq("event_type", "contacter_whatsapp")
+      .gte("created_at", startUTC.toISOString())
+      .lte("created_at", endUTC.toISOString()),
+  ]);
+
+  const clickEvents = (clicksRes.data as ClickEvent[]) || [];
+  const labelMap = new Map<string, number>();
+
+  for (const event of clickEvents) {
+    const url = event.voiture_url || "";
+    if (!url.includes("/recherches")) continue;
+    const label = event.voiture_label || "Recherche inconnue";
+    labelMap.set(label, (labelMap.get(label) || 0) + 1);
+  }
+
+  const topLabels = Array.from(labelMap.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  return {
+    pageVisits: visitsRes.data?.length || 0,
+    whatsappClicks: Array.from(labelMap.values()).reduce((sum, c) => sum + c, 0),
+    topLabels,
+  };
+}
+
+interface VisitorStats {
+  newVisitors: number;
+  returningVisitors: number;
+}
+
+async function getVisitorStats(
+  supabase: ReturnType<typeof createClient>,
+  startUTC: Date,
+  endUTC: Date
+): Promise<VisitorStats> {
+  const startISO = startUTC.toISOString();
+  const endISO = endUTC.toISOString();
+
+  const [newRes, returningRes] = await Promise.all([
+    supabase
+      .from("visitor_profiles")
+      .select("*", { count: "exact", head: true })
+      .gte("first_seen", startISO)
+      .lte("first_seen", endISO),
+    supabase
+      .from("visitor_profiles")
+      .select("*", { count: "exact", head: true })
+      .gte("last_seen", startISO)
+      .lte("last_seen", endISO)
+      .lt("first_seen", startISO),
+  ]);
+
+  return {
+    newVisitors: newRes.count || 0,
+    returningVisitors: returningRes.count || 0,
+  };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -201,6 +467,9 @@ Deno.serve(async (req: Request) => {
     const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN");
     const chatId = Deno.env.get("TELEGRAM_CHAT_ID");
     const threadIdDailyDigest = Deno.env.get("THREAD_ID_DAILY_DIGEST");
+    const threadIdVoirVehicule = Deno.env.get("THREAD_ID_VOIR_VEHICULE");
+    const threadIdSellerLeads = Deno.env.get("THREAD_ID_SELLER_LEADS");
+    const threadIdResearchedCarsSellerLeads = Deno.env.get("THREAD_ID_SELLER_LEADS");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -234,6 +503,14 @@ Deno.serve(async (req: Request) => {
     const vehicleViews = await getVehicleViewsStats(supabase, startUTC, endUTC);
     const whatsappContacts = await getWhatsAppContactsStats(supabase, startUTC, endUTC);
     const searchQueriesCount = await getSearchQueriesCount(supabase, startUTC, endUTC);
+
+    // Fetch new reports data
+    const pageVisits = await getPageVisitsStats(supabase, startUTC, endUTC);
+    const galleryClicks = await getGalleryClicksStats(supabase, startUTC, endUTC);
+    const timeOnPage = await getTimeOnPageStats(supabase, startUTC, endUTC);
+    const sellerFunnel = await getSellerFunnelStats(supabase, startUTC, endUTC);
+    const recherchesSourcing = await getRecherchesSourcingStats(supabase, startUTC, endUTC);
+    const visitorStats = await getVisitorStats(supabase, startUTC, endUTC);
 
     // Build combined message
     let message = `📊 *Rapport quotidien — Voitures Dispo*
@@ -274,8 +551,139 @@ Deno.serve(async (req: Request) => {
       message += `Aucune recherche aujourd'hui.`;
     }
 
+    // REPORT 0 — Visiteurs du jour (ajouté Phase 3 visitor tracking)
+    // Requires visitor_profiles table to be populated by src/lib/visitor.ts
+    if (threadIdVoirVehicule) {
+      const totalVisitors = visitorStats.newVisitors + visitorStats.returningVisitors;
+      let report0: string;
+      if (totalVisitors > 0) {
+        report0 = `📊 *Rapport du jour — Visiteurs*
+📅 ${reportDate}
+👥 Visiteurs uniques aujourd'hui : ${totalVisitors}
+  • Nouveaux visiteurs : ${visitorStats.newVisitors}
+  • Visiteurs de retour : ${visitorStats.returningVisitors}`;
+      } else {
+        report0 = `📊 *Rapport du jour — Visiteurs*
+📅 ${reportDate}
+👥 Aucun visiteur aujourd'hui.`;
+      }
+      await sendTelegramMessage(botToken, chatId, threadIdVoirVehicule, report0);
+    }
+
     // Send single combined message
     await sendTelegramMessage(botToken, chatId, threadIdDailyDigest, message);
+
+    // REPORT 4 — Visites par page
+    if (threadIdDailyDigest) {
+      let report4: string;
+      if (pageVisits.total > 0) {
+        report4 = `📊 *Rapport du jour — Visites*
+📅 ${reportDate}
+
+📄 Visites aujourd'hui :
+- Catalogue : ${pageVisits.catalogue}
+- Palmarès : ${pageVisits.palmares}
+- Fiches véhicules : ${pageVisits.vehicleTotal}
+
+Top fiches visitées :
+${pageVisits.topVehicles.map(v => `- ${v.count} × *${v.label}*`).join("\n")}`;
+      } else {
+        report4 = `📊 *Rapport du jour — Visites*
+📅 ${reportDate}
+
+📄 Aucune visite de page aujourd'hui.`;
+      }
+      await sendTelegramMessage(botToken, chatId, threadIdDailyDigest, report4);
+    }
+
+    // REPORT 5 — Intérêt galeries photos
+    if (threadIdDailyDigest) {
+      let report5: string;
+      if (galleryClicks.total > 0) {
+        report5 = `📊 *Rapport du jour — Galeries photos*
+📅 ${reportDate}
+
+🖼 ${galleryClicks.total} clic(s) sur des galeries photos aujourd'hui.
+
+Détail :
+${galleryClicks.top.map(v => `- ${v.count} × *${v.label}*`).join("\n")}`;
+      } else {
+        report5 = `📊 *Rapport du jour — Galeries photos*
+📅 ${reportDate}
+
+🖼 Aucun clic sur une galerie aujourd'hui.`;
+      }
+      await sendTelegramMessage(botToken, chatId, threadIdDailyDigest, report5);
+    }
+
+    // REPORT 6 — Temps passé sur les fiches
+    if (threadIdDailyDigest) {
+      let report6: string;
+      if (timeOnPage.total > 0) {
+        report6 = `📊 *Rapport du jour — Lecture des fiches*
+📅 ${reportDate}
+
+⏱ Comportement de lecture aujourd'hui :
+- Rebonds (< 10s) : ${timeOnPage.rebond}
+- Lecture rapide (10–59s) : ${timeOnPage.lu_rapidement}
+- Lecture complète (60s+) : ${timeOnPage.lu_en_detail}`;
+      } else {
+        report6 = `📊 *Rapport du jour — Lecture des fiches*
+📅 ${reportDate}
+
+⏱ Aucune donnée de lecture aujourd'hui.`;
+      }
+      await sendTelegramMessage(botToken, chatId, threadIdDailyDigest, report6);
+    }
+
+    // REPORT 7 — Entonnoir vendeur palmarès
+    if (threadIdDailyDigest) {
+      let report7: string;
+      const { palmaresVisits, ctaClicks, formStarts, completedLeads } = sellerFunnel;
+      if (palmaresVisits > 0 || ctaClicks > 0 || formStarts > 0 || completedLeads > 0) {
+        const conversionRate = formStarts > 0
+          ? Math.round((completedLeads / formStarts) * 100) + "%"
+          : "N/A";
+        report7 = `📊 *Rapport du jour — Entonnoir vendeur*
+📅 ${reportDate}
+
+Palmarès visité : ${palmaresVisits}
+CTA cliqué : ${ctaClicks}
+Formulaire commencé : ${formStarts}
+Demandes complètes : ${completedLeads}
+
+Taux formulaire → demande : ${conversionRate}`;
+      } else {
+        report7 = `📊 *Rapport du jour — Entonnoir vendeur*
+📅 ${reportDate}
+
+Aucune activité vendeur aujourd'hui.`;
+      }
+      await sendTelegramMessage(botToken, chatId, threadIdDailyDigest, report7);
+    }
+
+    // REPORT 8 — Sourcing véhicules (/recherches page)
+    // Uses THREAD_ID_SELLER_LEADS (already set in secrets)
+    if (threadIdResearchedCarsSellerLeads) {
+      let report8: string;
+      if (recherchesSourcing.whatsappClicks > 0) {
+        const detailLines = recherchesSourcing.topLabels
+          .map(v => `- ${v.count} × *${v.label.length > 80 ? v.label.slice(0, 80) : v.label}*`)
+          .join("\n");
+        report8 = `📊 *Rapport du jour — Sourcing véhicules*
+📅 ${reportDate}
+👁 Visites page recherches : ${recherchesSourcing.pageVisits}
+🚗 Propositions reçues : ${recherchesSourcing.whatsappClicks}
+Détail :
+${detailLines}`;
+      } else {
+        report8 = `📊 *Rapport du jour — Sourcing véhicules*
+📅 ${reportDate}
+👁 Visites page recherches : ${recherchesSourcing.pageVisits}
+🚗 Aucune proposition reçue aujourd'hui.`;
+      }
+      await sendTelegramMessage(botToken, chatId, threadIdResearchedCarsSellerLeads, report8);
+    }
 
     return new Response(
       JSON.stringify({ success: true, message: "Daily digest sent successfully" }),

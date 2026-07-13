@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Voiture } from '../types/voiture';
 import { formatPrice } from '../utils/formatPrice';
 import { supabase } from '../lib/supabase';
 import { sendTelegramNotification, THREAD_IDS } from '../lib/telegram';
+import { getOrCreateVisitorId, getVisitorShortId, getVisitorSourceLabel } from '../lib/visitor';
 
 interface CarCardProps {
   car: Voiture;
@@ -11,17 +12,14 @@ interface CarCardProps {
 
 export function CarCard({ car }: CarCardProps) {
   const isSold = car.status === 'sold';
-  const totalPrice = car.ownerAskingPrice + car.serviceFee;
   const [imgError, setImgError] = useState(false);
   const hasImage = car.images[0] && !imgError;
-  const navigate = useNavigate();
 
   const voitureLabel = `${car.year} ${car.make} ${car.model} ${car.licencePlateLetters}`;
   const voitureUrl = `${window.location.origin}/voitures/${car.id}`;
 
-  const handleCtaClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const tracking = async () => {
+  const handleClick = () => {
+    (async () => {
       try {
         await supabase.from('click_events').insert({
           event_type: 'voir_vehicule',
@@ -29,33 +27,34 @@ export function CarCard({ car }: CarCardProps) {
           voiture_label: voitureLabel,
           voiture_url: voitureUrl,
           search_query: null,
+          visitor_id: getOrCreateVisitorId(),
+          visitor_short_id: getVisitorShortId(),
         });
 
-        const { count } = await supabase
-          .from('click_events')
-          .select('*', { count: 'exact', head: true })
-          .eq('event_type', 'voir_vehicule')
-          .eq('voiture_id', car.id);
+        const [{ count }, sourceLabel] = await Promise.all([
+          supabase
+            .from('click_events')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_type', 'voir_vehicule')
+            .eq('voiture_id', car.id),
+          getVisitorSourceLabel(getOrCreateVisitorId())
+        ]);
+        const source = sourceLabel || 'accès direct';
 
         await sendTelegramNotification(
-          `\u{1F441} Click #${count ?? '?'} sur *${voitureLabel}*\n${voitureUrl}`,
+          `\u{1F441} Click #${count ?? '?'} sur *${voitureLabel}*\n${voitureUrl}\n\u{1F464} ${getVisitorShortId()} · ${source}`,
           String(THREAD_IDS.voirVehicule)
         );
       } catch {
         // silently ignored
       }
-    };
-
-    Promise.race([
-      tracking(),
-      new Promise<void>(resolve => setTimeout(resolve, 800)),
-    ]).finally(() => {
-      navigate(`/voitures/${car.id}`);
-    });
+    })();
   };
 
   return (
-    <div
+    <Link
+      to={`/voitures/${car.id}`}
+      onClick={handleClick}
       className="group flex flex-col bg-white border border-vd-border rounded-sm overflow-hidden transition-shadow duration-300 hover:shadow-subtle-md cursor-pointer"
     >
       <div
@@ -89,6 +88,16 @@ export function CarCard({ car }: CarCardProps) {
             {isSold ? 'VENDU' : 'DISPONIBLE'}
           </div>
         </div>
+
+        {/* Photo hover overlay — desktop only */}
+        <div className="card-photo-overlay absolute inset-0 z-15 flex items-center justify-center">
+          <span
+            className="font-jost uppercase font-light"
+            style={{ fontSize: '11px', letterSpacing: '0.2em', color: '#FFFFFF' }}
+          >
+            {isSold ? 'VOIR LE VÉHICULE (VENDU) →' : 'VOIR LE VÉHICULE →'}
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-col flex-1 p-5">
@@ -96,7 +105,7 @@ export function CarCard({ car }: CarCardProps) {
           {car.year} {car.make} {car.model}
         </h3>
         <p className="font-jost font-normal text-vd-text mt-2 text-base">
-          {formatPrice(totalPrice)}
+          {formatPrice(car.displayedPrice)}
         </p>
         <div className="border-t border-vd-border my-4" />
         <p className="font-jost font-light text-vd-caption text-xs tracking-wide">
@@ -104,15 +113,11 @@ export function CarCard({ car }: CarCardProps) {
         </p>
       </div>
 
-      <button
-        type="button"
-        onClick={handleCtaClick}
-        className="border-t border-vd-border px-5 py-4 transition-all duration-200 group-hover:translate-x-1 text-left w-full"
-      >
+      <div className="border-t border-vd-border px-5 py-4 transition-all duration-200 group-hover:translate-x-1">
         <p className="font-jost uppercase font-light text-vd-text text-cta tracking-widest">
           {isSold ? 'VOIR LE VÉHICULE (VENDU) →' : 'VOIR LE VÉHICULE →'}
         </p>
-      </button>
-    </div>
+      </div>
+    </Link>
   );
 }

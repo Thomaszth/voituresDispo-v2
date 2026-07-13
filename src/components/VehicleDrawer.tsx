@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, GripVertical } from 'lucide-react';
 import { VoitureDB } from '../types/voitureDB';
-import { formatPrice } from '../utils/formatPrice';
 import { supabase } from '../lib/supabase';
 import { notifyVoituresChanged } from '../hooks/useVoitures';
 
@@ -39,6 +38,7 @@ interface FormState {
   warranty_details: string;
   owner_asking_price: string;
   service_fee: string;
+  displayed_price: string;
   images: string[];
 }
 
@@ -88,6 +88,7 @@ const EMPTY_FORM: FormState = {
   warranty_details: '',
   owner_asking_price: '',
   service_fee: '',
+  displayed_price: '',
   images: [],
 };
 
@@ -111,6 +112,7 @@ function voitureToForm(v: VoitureDB): FormState {
     warranty_details: v.warranty_details ?? '',
     owner_asking_price: String(v.owner_asking_price),
     service_fee: String(v.service_fee),
+    displayed_price: String(v.displayed_price ?? v.owner_asking_price + v.service_fee),
     images: v.images,
   };
 }
@@ -147,19 +149,18 @@ export function VehicleDrawer({ open, onClose, editing }: VehicleDrawerProps) {
   const [saving, setSaving] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const widgetRef = useRef<ReturnType<typeof window.cloudinary.createUploadWidget> | null>(null);
 
   useEffect(() => {
     if (open) {
       setForm(editing ? voitureToForm(editing) : EMPTY_FORM);
+      setValidationError(null);
     }
   }, [open, editing]);
 
   const set = (field: keyof FormState, value: unknown) =>
     setForm(prev => ({ ...prev, [field]: value }));
-
-  const totalPrice =
-    (parseInt(form.owner_asking_price) || 0) + (parseInt(form.service_fee) || 0);
 
   const CLOUD_NAME = import.meta.env.VITE_CLOUD_NAME as string;
   const UPLOAD_PRESET = import.meta.env.VITE_UPLOAD_PRESET as string;
@@ -246,6 +247,10 @@ export function VehicleDrawer({ open, onClose, editing }: VehicleDrawerProps) {
   const handleSave = async () => {
     console.log('ENREGISTRER cliqué');
     if (!form.make.trim() || !form.model.trim()) return;
+    if (!form.displayed_price.trim()) {
+      setValidationError('Ce champ est obligatoire.');
+      return;
+    }
     setSaving(true);
 
     const payload: Omit<VoitureDB, 'created_at'> = {
@@ -255,6 +260,7 @@ export function VehicleDrawer({ open, onClose, editing }: VehicleDrawerProps) {
       year: parseInt(form.year) || new Date().getFullYear(),
       owner_asking_price: parseInt(form.owner_asking_price) || 0,
       service_fee: parseInt(form.service_fee) || 0,
+      displayed_price: parseInt(form.displayed_price) || 0,
       mileage: numberToMileageString(form.mileage),
       color: form.color.trim(),
       fuel_type: form.fuel_type,
@@ -416,6 +422,26 @@ export function VehicleDrawer({ open, onClose, editing }: VehicleDrawerProps) {
           <SectionHeader title="Informations commerciales" />
 
           <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <label className={labelClass}>PRIX AFFICHÉ AUX VISITEURS</label>
+              <p className="font-jost font-light text-[11px]" style={{ color: '#9A9A9A' }}>
+                C'est le seul prix visible sur le site.
+              </p>
+              <input
+                type="number"
+                className={inputClass}
+                value={form.displayed_price}
+                onChange={e => {
+                  set('displayed_price', e.target.value);
+                  setValidationError(null);
+                }}
+                placeholder="Le prix que les visiteurs verront"
+              />
+              {validationError && (
+                <p className="text-red-500 text-xs font-jost font-light mt-1">{validationError}</p>
+              )}
+            </div>
+
             <Field label="Localisation du véhicule">
               <input className={inputClass} value={form.vehicle_location} onChange={e => set('vehicle_location', e.target.value)} />
             </Field>
@@ -479,15 +505,6 @@ export function VehicleDrawer({ open, onClose, editing }: VehicleDrawerProps) {
                 onChange={e => set('service_fee', e.target.value)}
               />
             </Field>
-
-            <div className="flex justify-between items-center py-3 border-b border-vd-border">
-              <span className="font-jost font-light text-vd-meta text-sm uppercase tracking-[0.1em]">
-                Prix total affiché
-              </span>
-              <span className="font-jost font-semibold text-vd-text text-base">
-                {formatPrice(totalPrice)}
-              </span>
-            </div>
           </div>
 
           <SectionHeader title="Photos" />

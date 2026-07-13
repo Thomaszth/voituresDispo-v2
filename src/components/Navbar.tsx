@@ -1,8 +1,17 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { sendTelegramNotification, THREAD_IDS } from '../lib/telegram';
+import { useTypingPlaceholder } from '../hooks/useTypingPlaceholder';
+import { getOrCreateVisitorId, getVisitorShortId, getVisitorSourceLabel } from '../lib/visitor';
+
+const TYPING_PHRASES = [
+  'Toyota Camry...',
+  'V4 Automatique...',
+  'Mercedes CLA250 2015...',
+  'Rechercher par marque, modèle...',
+];
 
 interface NavbarProps {
   searchValue: string;
@@ -12,10 +21,19 @@ interface NavbarProps {
 
 export default function Navbar({ searchValue, onSearchChange, onSearchSubmit }: NavbarProps) {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [desktopFocused, setDesktopFocused] = useState(false);
+  const [mobileFocused, setMobileFocused] = useState(false);
+  const [hasActiveRecherches, setHasActiveRecherches] = useState(false);
   const mobileInputRef = useRef<HTMLInputElement>(null);
   const desktopInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  const desktopActive = !searchValue && !desktopFocused;
+  const mobileActive = mobileSearchOpen && !searchValue && !mobileFocused;
+
+  const desktopTyping = useTypingPlaceholder({ phrases: TYPING_PHRASES, active: desktopActive });
+  const mobileTyping = useTypingPlaceholder({ phrases: TYPING_PHRASES, active: mobileActive });
 
   useEffect(() => {
     setMobileSearchOpen(false);
@@ -48,12 +66,21 @@ export default function Navbar({ searchValue, onSearchChange, onSearchSubmit }: 
           voiture_id: null,
           voiture_label: null,
           voiture_url: null,
+          visitor_id: getOrCreateVisitorId(),
+          visitor_short_id: getVisitorShortId(),
         });
 
+        const sourceLabel = await getVisitorSourceLabel(getOrCreateVisitorId());
+        const source = sourceLabel || 'accès direct';
+
         await sendTelegramNotification(
-          `\u{1F50D} Nouvelle recherche : *${current}*`,
+          `\u{1F50D} Nouvelle recherche : *${current}*\n\u{1F464} ${getVisitorShortId()} · ${source}`,
           String(THREAD_IDS.searchQueries)
         );
+
+        if (typeof fbq !== 'undefined') {
+          fbq('track', 'Search', { search_string: current });
+        }
       } catch {
         // silently ignored
       }
@@ -65,6 +92,22 @@ export default function Navbar({ searchValue, onSearchChange, onSearchSubmit }: 
   useEffect(() => {
     lastTrackedQuery.current = null;
   }, [location.pathname]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { count, error } = await supabase
+          .from('recherches')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'active');
+        if (!error && count !== null && count > 0) {
+          setHasActiveRecherches(true);
+        }
+      } catch {
+        // silently ignored
+      }
+    })();
+  }, []);
 
   const handleClear = () => {
     onSearchChange('');
@@ -94,12 +137,27 @@ export default function Navbar({ searchValue, onSearchChange, onSearchSubmit }: 
     }
   };
 
-  const handleBlur = () => {
+  const handleDesktopBlur = useCallback(() => {
+    setDesktopFocused(false);
     const isCatalogue = location.pathname === '/catalogue' || location.pathname === '/';
     if (!isCatalogue && searchValue.trim()) {
       handleSearchSubmit(searchValue);
     }
-  };
+    if (!searchValue) {
+      desktopTyping.restart();
+    }
+  }, [location.pathname, searchValue, desktopTyping]);
+
+  const handleMobileBlur = useCallback(() => {
+    setMobileFocused(false);
+    const isCatalogue = location.pathname === '/catalogue' || location.pathname === '/';
+    if (!isCatalogue && searchValue.trim()) {
+      handleSearchSubmit(searchValue);
+    }
+    if (!searchValue && mobileSearchOpen) {
+      mobileTyping.restart();
+    }
+  }, [location.pathname, searchValue, mobileSearchOpen, mobileTyping]);
 
   return (
     <header className="sticky top-0 z-50 w-full bg-vd-black border-b border-white/5">
@@ -123,11 +181,12 @@ export default function Navbar({ searchValue, onSearchChange, onSearchSubmit }: 
               <input
                 ref={desktopInputRef}
                 type="text"
-                placeholder="Rechercher par marque, modèle, année, carburant..."
+                placeholder={desktopActive ? desktopTyping.placeholder : ''}
                 value={searchValue}
                 onChange={e => onSearchChange(e.target.value)}
                 onKeyDown={handleKeyDown}
-                onBlur={handleBlur}
+                onFocus={() => setDesktopFocused(true)}
+                onBlur={handleDesktopBlur}
                 className="w-full pl-10 pr-9 py-2 rounded-full font-jost font-light text-sm text-white placeholder-vd-caption focus:outline-none transition-colors duration-200 bg-vd-dark-2"
               />
               {searchValue && (
@@ -143,6 +202,31 @@ export default function Navbar({ searchValue, onSearchChange, onSearchSubmit }: 
           </div>
 
           <div className="flex-shrink-0 ml-auto flex items-center gap-4">
+            <NavLink
+              to="/recherches"
+              className={({ isActive }) =>
+                `font-jost uppercase font-light no-underline transition-all duration-200 ${
+                  isActive ? 'opacity-100 underline' : 'opacity-70 hover:opacity-100 hover:underline'
+                }`
+              }
+              style={{ fontSize: '11px', letterSpacing: '0.18em', color: '#FFFFFF', textDecorationColor: 'currentColor' }}
+            >
+              <span className="flex items-center">
+                RECHERCHES
+                {hasActiveRecherches && (
+                  <span
+                    className="ml-1"
+                    style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor: '#FFFFFF',
+                      animation: 'pulse-dot 2s ease-in-out infinite',
+                    }}
+                  />
+                )}
+              </span>
+            </NavLink>
             <NavLink
               to="/palmares"
               className={({ isActive }) =>
@@ -178,8 +262,9 @@ export default function Navbar({ searchValue, onSearchChange, onSearchSubmit }: 
             value={searchValue}
             onChange={e => onSearchChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            onBlur={handleBlur}
-            placeholder="Rechercher par marque, modèle, année..."
+            onFocus={() => setMobileFocused(true)}
+            onBlur={handleMobileBlur}
+            placeholder={mobileActive ? mobileTyping.placeholder : ''}
             className="flex-1 bg-transparent font-jost font-light text-white placeholder-vd-caption focus:outline-none text-sm"
           />
           <button

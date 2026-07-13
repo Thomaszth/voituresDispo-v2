@@ -90,4 +90,18 @@
   .anim-init {
     opacity: 0;
   }
+
+  /* Photo hover overlay on cards — desktop only */
+  .card-photo-overlay {
+    background: rgba(0, 0, 0, 0);
+    opacity: 0;
+    transition: background 300ms ease, opacity 300ms ease;
+  }
+}
+
+@media (hover: hover) {
+  .group:hover .card-photo-overlay {
+    background: rgba(0, 0, 0, 0.38);
+    opacity: 1;
+  }
 }
