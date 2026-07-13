@@ -1,31 +1,29 @@
-const BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN as string;
-const CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID as string;
+const PROXY_URL = 'https://cfrkjnphcifbucufrvxu.supabase.co/functions/v1/telegram-proxy';
 
 export const THREAD_IDS = {
-  voirVehicule: Number(import.meta.env.VITE_TELEGRAM_CLICK_VOIR_VEHICULE_MESSAGE_THREAD_ID),
-  contacterWhatsapp: Number(import.meta.env.VITE_TELEGRAM_CLICK_CONTACTER_SUR_WHATSAPP_MESSAGE_THREAD_ID),
-  partagerVehicule: Number(import.meta.env.VITE_TELEGRAM_CLICK_PARTAGER_VEHICULE_MESSAGE_THREAD_ID),
-  searchQueries: Number(import.meta.env.VITE_TELEGRAM_SEARCH_QUERIES_MESSAGE_THREAD_ID),
-  dailyReport: Number(import.meta.env.VITE_TELEGRAM_DAILY_REPORT_MESSAGE_THREAD_ID),
-  carSellerLeads: Number(import.meta.env.VITE_TELEGRAM_CAR_SELLER_LEADS_MESSAGE_THREAD_ID),
-  catalogPageVisit: Number(import.meta.env.VITE_TELEGRAM_CATALOG_PAGE_VISIT_MESSAGE_THREAD_ID),
-  carPageVisit: Number(import.meta.env.VITE_TELEGRAM_CAR_PAGE_VISIT_MESSAGE_THREAD_ID),
-  palmaresPageVisit: Number(import.meta.env.VITE_TELEGRAM_PALMARES_PAGE_VISIT_MESSAGE_THREAD_ID),
-  clicksThroughCarThumbnailsOfCarPage: Number(import.meta.env.VITE_TELEGRAM_CLICKS_THROUGH_CAR_THUMBNAILS_OF_CAR_PAGE_MESSAGE_THREAD_ID),
-  timeSpentOnCarOfCarPage: Number(import.meta.env.VITE_TELEGRAM_TIME_SPENT_ON_CAR_OF_CAR_PAGE_MESSAGE_THREAD_ID),
-  paginationDepthTracking: Number(import.meta.env.VITE_TELEGRAM_PAGINATION_DEPTH_TRACKING_MESSAGE_THREAD_ID),
+  voirVehicule: "401",
+  contacterWhatsapp: "889",
+  partagerVehicule: "890",
+  searchQueries: "892",
+  dailyReport: "894",
+  carSellerLeads: "895",
+  catalogPageVisit: "982",
+  carPageVisit: "983",
+  palmaresPageVisit: "985",
+  clicksThroughCarThumbnailsOfCarPage: "1016",
+  timeSpentOnCarOfCarPage: "1051",
+  paginationDepthTracking: "1209",
+  recherchesPageVisit: "12469",
 };
 
 export async function sendTelegramNotification(message: string, threadId: string) {
   try {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    await fetch(PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: CHAT_ID,
-        message_thread_id: threadId,
-        parse_mode: 'Markdown',
-        text: message,
+        message: message,
+        threadId: threadId,
       }),
     });
   } catch {

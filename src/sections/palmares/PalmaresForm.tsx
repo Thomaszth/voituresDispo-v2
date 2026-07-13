@@ -1,36 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { sendTelegramNotification, THREAD_IDS } from '../../lib/telegram';
-
-const BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN as string;
-const CHAT_ID = import.meta.env.VITE_TELEGRAM_CHAT_ID as string;
-const THREAD_ID = Number(import.meta.env.VITE_TELEGRAM_CAR_SELLER_LEADS_MESSAGE_THREAD_ID);
-
-function formatDateNow(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} à ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-}
-
-async function sendTelegram(text: string) {
-  try {
-    const body: Record<string, unknown> = {
-      chat_id: CHAT_ID,
-      parse_mode: 'Markdown',
-      text,
-    };
-    if (THREAD_ID) {
-      body.message_thread_id = Number(THREAD_ID);
-    }
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    // silently ignored
-  }
-}
+import { getOrCreateVisitorId, getVisitorShortId, getVisitorHistory, getVisitorSourceLabel } from '../../lib/visitor';
 
 const inputStyle =
   'w-full border border-vd-border bg-white font-jost font-light text-vd-text py-[14px] px-4 text-sm focus:outline-none focus:border-vd-text transition-colors duration-150';
@@ -63,13 +34,19 @@ export function PalmaresForm({ onStepChange }: PalmaresFormProps) {
           voiture_label: 'palmares_form',
           voiture_url: window.location.href,
           search_query: null,
+          visitor_id: getOrCreateVisitorId(),
+          visitor_short_id: getVisitorShortId(),
         });
-        const { count } = await supabase
-          .from('click_events')
-          .select('*', { count: 'exact', head: true })
-          .eq('event_type', 'form_started');
+        const [{ count }, sourceLabel] = await Promise.all([
+          supabase
+            .from('click_events')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_type', 'form_started'),
+          getVisitorSourceLabel(getOrCreateVisitorId())
+        ]);
+        const source = sourceLabel || 'accès direct';
         await sendTelegramNotification(
-          `\u270D\uFE0F Formulaire palmarès commencé #${count ?? '?'} fois\nUn visiteur a commencé à remplir le formulaire.`,
+          `\u270D\uFE0F Formulaire palmarès commencé #${count ?? '?'} fois\nUn visiteur a commencé à remplir le formulaire.\n\u{1F464} ${getVisitorShortId()} · ${source}`,
           String(THREAD_IDS.carSellerLeads)
         );
       } catch {
@@ -99,9 +76,23 @@ export function PalmaresForm({ onStepChange }: PalmaresFormProps) {
         setErrors(newErrors);
         return;
       }
-      sendTelegram(
-        `*🚗 Nouveau contact — Palmarès*\n\n*Nom :* ${fullName.trim()}\n*Téléphone :* ${phone.trim()}\n*Statut :* Contact capturé (étape 1) ⏳\n*Reçu le :* ${formatDateNow()}`
-      );
+      (async () => {
+        const now = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} à ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        const visitorId = getOrCreateVisitorId();
+        const history = await getVisitorHistory(visitorId);
+        const historyBlock = history ? `\n${history}` : '';
+        sendTelegramNotification(
+          `*🚗 Nouveau contact — Palmarès*\n\n*Nom :* ${fullName.trim()}\n*Téléphone :* ${phone.trim()}\n*Statut :* Contact capturé (étape 1) ⏳\n*Reçu le :* ${dateStr}${historyBlock}`,
+          String(THREAD_IDS.carSellerLeads)
+        );
+      })();
+
+      if (typeof fbq !== 'undefined') {
+        fbq('track', 'Lead');
+      }
+      
       setErrors({});
       setCurrentStep(2);
     } else if (currentStep === 2) {
@@ -121,9 +112,18 @@ export function PalmaresForm({ onStepChange }: PalmaresFormProps) {
         // silently ignored
       }
       const priceDisplay = askingPrice.trim() || 'Non renseigné';
-      sendTelegram(
-        `*✅ Demande complète — Palmarès*\n\n*Nom :* ${fullName.trim()}\n*Téléphone :* ${phone.trim()}\n*Véhicule :* ${vehicleName.trim()}\n*Prix souhaité :* ${priceDisplay}\n*Statut :* Demande complète ✅\n*Reçu le :* ${formatDateNow()}`
-      );
+      (async () => {
+        const now = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} à ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        const visitorId = getOrCreateVisitorId();
+        const history = await getVisitorHistory(visitorId);
+        const historyBlock = history ? `\n${history}` : '';
+        sendTelegramNotification(
+          `*✅ Demande complète — Palmarès*\n\n*Nom :* ${fullName.trim()}\n*Téléphone :* ${phone.trim()}\n*Véhicule :* ${vehicleName.trim()}\n*Prix souhaité :* ${priceDisplay}\n*Statut :* Demande complète ✅\n*Reçu le :* ${dateStr}${historyBlock}`,
+          String(THREAD_IDS.carSellerLeads)
+        );
+      })();
       setErrors({});
       setCurrentStep(3);
     }

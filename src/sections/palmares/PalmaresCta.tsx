@@ -1,5 +1,6 @@
 import { sendTelegramNotification, THREAD_IDS } from '../../lib/telegram';
 import { supabase } from '../../lib/supabase';
+import { getOrCreateVisitorId, getVisitorShortId, getVisitorSourceLabel } from '../../lib/visitor';
 
 export function PalmaresCta() {
   const scrollToForm = () => {
@@ -11,13 +12,19 @@ export function PalmaresCta() {
           voiture_label: 'cta_confier_vehicule',
           voiture_url: window.location.href,
           search_query: null,
+          visitor_id: getOrCreateVisitorId(),
+          visitor_short_id: getVisitorShortId(),
         });
-        const { count } = await supabase
-          .from('click_events')
-          .select('*', { count: 'exact', head: true })
-          .eq('event_type', 'cta_palmares');
+        const [{ count }, sourceLabel] = await Promise.all([
+          supabase
+            .from('click_events')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_type', 'cta_palmares'),
+          getVisitorSourceLabel(getOrCreateVisitorId())
+        ]);
+        const source = sourceLabel || 'accès direct';
         await sendTelegramNotification(
-          `\u{1F3AF} CTA palmarès cliqué #${count ?? '?'} fois\nUn visiteur veut confier son véhicule.`,
+          `\u{1F3AF} CTA palmarès cliqué #${count ?? '?'} fois\nUn visiteur veut confier son véhicule.\n\u{1F464} ${getVisitorShortId()} · ${source}`,
           String(THREAD_IDS.carSellerLeads)
         );
       } catch {

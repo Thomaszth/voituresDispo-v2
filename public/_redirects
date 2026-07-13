@@ -1,0 +1,8 @@
+# Open Graph crawler redirects
+/voitures/:id  https://cfrkjnphcifbucufrvxu.supabase.co/functions/v1/og-preview?id=:id  302  User-Agent=facebookexternalhit/*
+/voitures/:id  https://cfrkjnphcifbucufrvxu.supabase.co/functions/v1/og-preview?id=:id  302  User-Agent=Twitterbot/*
+/voitures/:id  https://cfrkjnphcifbucufrvxu.supabase.co/functions/v1/og-preview?id=:id  302  User-Agent=TelegramBot/*
+/voitures/:id  https://cfrkjnphcifbucufrvxu.supabase.co/functions/v1/og-preview?id=:id  302  User-Agent=WhatsApp/*
+/voitures/:id  https://cfrkjnphcifbucufrvxu.supabase.co/functions/v1/og-preview?id=:id  302  User-Agent=LinkedInBot/*
+# SPA catch-all
+/*  /index.html  200

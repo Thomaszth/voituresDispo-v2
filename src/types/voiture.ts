@@ -5,6 +5,7 @@ export interface Voiture {
   year: number;
   ownerAskingPrice: number;
   serviceFee: number;
+  displayedPrice: number;
   mileage: string;
   color: string;
   fuelType: "Essence" | "Diesel" | "Électrique" | "Hybride";

@@ -18,3 +18,12 @@
 .scroll-hint-bob {
   animation: scroll-hint-bob 1.8s ease-in-out infinite;
 }
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}

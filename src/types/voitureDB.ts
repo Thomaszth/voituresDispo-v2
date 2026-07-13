@@ -5,6 +5,7 @@ export interface VoitureDB {
   year: number;
   owner_asking_price: number;
   service_fee: number;
+  displayed_price?: number | null;
   mileage: string;
   color: string;
   fuel_type: 'Essence' | 'Diesel' | 'Électrique' | 'Hybride';
@@ -31,6 +32,7 @@ export function dbToVoiture(v: VoitureDB) {
     year: v.year,
     ownerAskingPrice: v.owner_asking_price,
     serviceFee: v.service_fee,
+    displayedPrice: v.displayed_price ?? v.owner_asking_price + v.service_fee,
     mileage: v.mileage,
     color: v.color,
     fuelType: v.fuel_type,

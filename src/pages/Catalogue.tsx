@@ -1,13 +1,22 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { VehicleRequestForm } from '../components/VehicleRequestForm';
 import { CarCard } from '../components/CarCard';
+import { Pagination } from '../components/Pagination';
 import { matchesCar } from '../utils/matchesCar';
 import { useVoitures } from '../hooks/useVoitures';
+import { useScrollHint } from '../hooks/useScrollHint';
 import { dbToVoiture } from '../types/voitureDB';
 import { ChevronDown } from 'lucide-react';
 import { trackSession } from '../lib/session';
-import { supabase } from '../lib/supabase';
-import { sendTelegramNotification, THREAD_IDS } from '../lib/telegram';
+import { THREAD_IDS } from '../lib/telegram';
+import { useCarPageTracking } from '../hooks/useCarPageTracking';
+import { MSG_CATALOGUE_VISIT, MSG_PAGINATION_DEPTH } from '../constants/notificationMessages';
+import { LABEL_LOADING } from '../constants/carDetailLabels';
+import {
+  CATALOGUE_HERO_TITLE,
+  CATALOGUE_HERO_SUBTITLE,
+  resultsCountMessage,
+} from '../constants/catalogueLabels';
 
 const CARS_PER_PAGE = 8;
 
@@ -18,8 +27,8 @@ interface CatalogueProps {
 
 export default function Catalogue({ searchValue, onClearSearch }: CatalogueProps) {
   const { voitures: rawVoitures, loading } = useVoitures();
-  const [showScrollHint, setShowScrollHint] = useState(false);
-  const [hintVisible, setHintVisible] = useState(false);
+  const { trackAndNotify } = useCarPageTracking();
+  const { showScrollHint, hintVisible } = useScrollHint();
   const [currentPage, setCurrentPage] = useState(1);
   const gridRef = useRef<HTMLElement>(null);
 
@@ -28,46 +37,21 @@ export default function Catalogue({ searchValue, onClearSearch }: CatalogueProps
     (async () => {
       try {
         await trackSession();
-        const label = 'catalogue';
-        await supabase.from('click_events').insert({
-          event_type: 'page_visit',
-          voiture_id: null,
-          voiture_label: label,
-          voiture_url: window.location.href,
-          search_query: null,
+        await trackAndNotify({
+          eventType: 'page_visit',
+          voitureId: null,
+          voitureLabel: 'catalogue',
+          voitureUrl: window.location.href,
+          threadId: String(THREAD_IDS.catalogPageVisit),
+          countFilterField: 'voiture_label',
+          buildMessage: (count, visitorShortId, source) =>
+            MSG_CATALOGUE_VISIT(count, window.location.href, visitorShortId, source),
         });
-        const { count } = await supabase
-          .from('click_events')
-          .select('*', { count: 'exact', head: true })
-          .eq('event_type', 'page_visit')
-          .eq('voiture_label', label);
-        // Dedicated thread ID for page visits can be added to THREAD_IDS later if the owner wants
-        await sendTelegramNotification(
-          `\u{1F4C4} Visite catalogue #${count ?? '?'}\n${window.location.href}`,
-          String(THREAD_IDS.catalogPageVisit)
-        );
       } catch {
         // silently ignored
       }
     })();
-  }, []);
-
-  useEffect(() => {
-    const fadeTimeout = setTimeout(() => {
-      setHintVisible(true);
-    }, 1200);
-    return () => clearTimeout(fadeTimeout);
-  }, []);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 80) {
-        setShowScrollHint(true);
-      }
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [trackAndNotify]);
 
   const allCars = useMemo(() => rawVoitures.map(dbToVoiture), [rawVoitures]);
 
@@ -92,26 +76,19 @@ export default function Catalogue({ searchValue, onClearSearch }: CatalogueProps
       gridRef.current.scrollIntoView({ behavior: 'smooth' });
     }
     if (page > 1) {
+      const searchQuery = searchValue.trim() || null;
       (async () => {
         try {
-          const voitureLabel = 'page_' + page;
-          const searchQuery = searchValue.trim() || null;
-          await supabase.from('click_events').insert({
-            event_type: 'pagination_depth',
-            voiture_id: null,
-            voiture_label: voitureLabel,
-            voiture_url: window.location.href,
-            search_query: searchQuery,
+          await trackAndNotify({
+            eventType: 'pagination_depth',
+            voitureId: null,
+            voitureLabel: 'page_' + page,
+            voitureUrl: window.location.href,
+            threadId: String(THREAD_IDS.paginationDepthTracking),
+            countFilterField: 'voiture_label',
+            buildMessage: (count, visitorShortId, source) =>
+              MSG_PAGINATION_DEPTH(page, count, searchQuery, visitorShortId, source),
           });
-          const { count } = await supabase
-            .from('click_events')
-            .select('*', { count: 'exact', head: true })
-            .eq('event_type', 'pagination_depth')
-            .eq('voiture_label', voitureLabel);
-          await sendTelegramNotification(
-            `\u{1F4CB} Page ${page} du catalogue visitée #${count ?? '?'} fois\nRecherche active : ${searchQuery ?? 'aucune'}`,
-            String(THREAD_IDS.paginationDepthTracking)
-          );
         } catch {
           // silently ignored
         }
@@ -124,15 +101,15 @@ export default function Catalogue({ searchValue, onClearSearch }: CatalogueProps
 
   return (
     <main className="min-h-screen bg-white">
-      <section className="w-full bg-vd-black py-20 md:py-32 lg:py-40 relative">
+      <section className="w-full bg-vd-black pt-20 pb-10 md:py-32 lg:py-40 relative">
         <div className="px-5 md:px-8 lg:px-12 flex flex-col items-center text-center">
           <h1 className="font-cormorant font-light text-white mt-6 text-[clamp(48px,10vw,80px)] tracking-wide anim-init animate-fade-up">
-              Notre Collection
+              {CATALOGUE_HERO_TITLE}
 
           </h1>
           <div className="h-px bg-gray-600 mt-8 w-15 anim-init animate-fade-up" />
           <p className="font-jost font-light text-vd-caption mt-8 max-w-lg text-sm tracking-wide anim-init animate-fade-up">
-             Garantie: un seul intermédiaire, nous. 
+             {CATALOGUE_HERO_SUBTITLE}  
           </p>
         </div>
         {!showScrollHint && (
@@ -142,8 +119,7 @@ export default function Catalogue({ searchValue, onClearSearch }: CatalogueProps
           >
             <ChevronDown
               size={20}
-              className="scroll-hint-bob"
-              style={{ color: '#9A9A9A' }}
+              className="scroll-hint-bob text-vd-caption"
             />
           </div>
         )}
@@ -152,14 +128,14 @@ export default function Catalogue({ searchValue, onClearSearch }: CatalogueProps
       {hasQuery && hasResults && (
         <div className="px-5 md:px-8 lg:px-12 pt-8 pb-0">
           <p className="font-jost font-light text-vd-caption text-xs">
-            {filteredCars.length} véhicule{filteredCars.length > 1 ? 's' : ''} trouvé{filteredCars.length > 1 ? 's' : ''}
+            {resultsCountMessage(filteredCars.length)}
           </p>
         </div>
       )}
 
       {loading ? (
         <section className="w-full bg-white px-5 md:px-8 lg:px-12 py-12">
-          <p className="font-jost font-light text-vd-caption text-sm">Chargement...</p>
+          <p className="font-jost font-light text-vd-caption text-sm">{LABEL_LOADING}</p>
         </section>
       ) : hasQuery && !hasResults ? (
         <section className="w-full bg-white px-5 md:px-8 lg:px-12">
@@ -173,32 +149,13 @@ export default function Catalogue({ searchValue, onClearSearch }: CatalogueProps
             ))}
           </div>
           {totalPages > 1 && (
-            <div className="flex items-center justify-center pt-12 md:pt-16 gap-8">
-              {currentPage > 1 && (
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  className="font-jost uppercase font-light text-[11px] tracking-[0.18em] transition-opacity duration-200 hover:opacity-50"
-                  style={{ color: '#0A0A0A' }}
-                >
-                  PRÉCÉDENT
-                </button>
-              )}
-              <span
-                className="font-jost font-light text-[12px]"
-                style={{ color: '#6B6B6B' }}
-              >
-                Page {currentPage} / {totalPages}
-              </span>
-              {currentPage < totalPages && (
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  className="font-jost uppercase font-light text-[11px] tracking-[0.18em] transition-opacity duration-200 hover:opacity-50"
-                  style={{ color: '#0A0A0A' }}
-                >
-                  SUIVANT
-                </button>
-              )}
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredCars.length}
+              itemsPerPage={CARS_PER_PAGE}
+              onPageChange={handlePageChange}
+            />
           )}
         </section>
       )}

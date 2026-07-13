@@ -1,0 +1,25 @@
+<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#0A0A0A"/>
+  <text
+    x="600"
+    y="290"
+    font-family="Georgia, serif"
+    font-size="72"
+    font-weight="300"
+    fill="#FFFFFF"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    letter-spacing="8"
+  >Voitures Dispo</text>
+  <text
+    x="600"
+    y="380"
+    font-family="Arial, sans-serif"
+    font-size="24"
+    font-weight="300"
+    fill="#9A9A9A"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    letter-spacing="4"
+  >CATALOGUE DE VÉHICULES — BÉNIN</text>
+</svg>
