@@ -1,3 +1,5 @@
+import { EVENT_TYPES } from '../constants/eventTypes';
+import { PAGE_LABELS, VOITURE_DETAIL_PATH_PREFIX } from '../constants/pageLabels';
 import { TIME_ON_PAGE_BUCKETS } from '../constants/visitorLabels';
 
 export function eventToLine(e: Record<string, unknown>): string | null {
@@ -6,29 +8,29 @@ export function eventToLine(e: Record<string, unknown>): string | null {
   const searchQuery = (e.search_query as string) ?? '';
 
   switch (eventType) {
-    case 'page_visit':
-      if (voitureLabel === 'catalogue') return '• A visité le catalogue';
-      if (voitureLabel === 'palmares') return '• A visité le palmarès';
-      if (voitureLabel === 'recherches') return '• A visité la page recherches';
-      if (voitureLabel.startsWith('/voitures/')) return `• A visité la fiche : ${voitureLabel}`;
+    case EVENT_TYPES.PAGE_VISIT:
+      if (voitureLabel === PAGE_LABELS.CATALOGUE) return '• A visité le catalogue';
+      if (voitureLabel === PAGE_LABELS.PALMARES) return '• A visité le palmarès';
+      if (voitureLabel === PAGE_LABELS.RECHERCHES) return '• A visité la page recherches';
+      if (voitureLabel.startsWith(VOITURE_DETAIL_PATH_PREFIX)) return `• A visité la fiche : ${voitureLabel}`;
       return null;
-    case 'voir_vehicule':
+    case EVENT_TYPES.VOIR_VEHICULE:
       return `• A cliqué sur VOIR LE VÉHICULE : ${voitureLabel}`;
-    case 'gallery_click':
+    case EVENT_TYPES.GALLERY_CLICK:
       return `• A navigué dans la galerie : ${voitureLabel}`;
-    case 'contacter_whatsapp':
+    case EVENT_TYPES.CONTACTER_WHATSAPP:
       return `• A cliqué WhatsApp : ${voitureLabel}`;
-    case 'partager_vehicule':
+    case EVENT_TYPES.PARTAGER_VEHICULE:
       return `• A partagé : ${voitureLabel}`;
-    case 'search_query':
+    case EVENT_TYPES.SEARCH_QUERY:
       return `• A recherché : ${searchQuery}`;
-    case 'cta_palmares':
+    case EVENT_TYPES.CTA_PALMARES:
       return '• A cliqué sur CONFIER MON VÉHICULE';
-    case 'form_started':
+    case EVENT_TYPES.FORM_STARTED:
       return '• A commencé le formulaire vendeur';
-    case 'pagination_depth':
+    case EVENT_TYPES.PAGINATION_DEPTH:
       return `• A navigué en ${voitureLabel}`;
-    case 'time_on_page':
+    case EVENT_TYPES.TIME_ON_PAGE:
       if (searchQuery === TIME_ON_PAGE_BUCKETS.readInDetail) return `• A lu en détail : ${voitureLabel}`;
       if (searchQuery === TIME_ON_PAGE_BUCKETS.readQuickly) return `• A lu rapidement : ${voitureLabel}`;
       if (searchQuery === TIME_ON_PAGE_BUCKETS.bounce) return null;
