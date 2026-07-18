@@ -3,8 +3,10 @@ export const VISITOR_SHORT_ID_FALLBACK = 'vst-inconnu';
 
 export const VISITOR_SOURCE_DIRECT = 'Accès direct';
 
-export const TABLE_VISITOR_PROFILES = 'visitor_profiles';
-export const TABLE_CLICK_EVENTS = 'click_events';
+import { TABLE_NAMES } from './tableNames';
+
+export const TABLE_VISITOR_PROFILES = TABLE_NAMES.VISITOR_PROFILES;
+export const TABLE_CLICK_EVENTS = TABLE_NAMES.CLICK_EVENTS;
 
 export const VISITOR_HISTORY_LABELS = {
   visitor: '👤 Visiteur :',
